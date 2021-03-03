@@ -1,7 +1,9 @@
 on: [push, pull_request]
 
 jobs:
-  unit:
+  integration:
+    env:
+      DEBUG: true
     strategy:
       fail-fast: false
       matrix:
@@ -19,9 +21,22 @@ jobs:
         run: go install github.com/onsi/ginkgo/ginkgo
       - name: Install dependencies
         run: go install
+      - name: set qlogger
+        if: ${{ env.DEBUG }}
+        run: echo "QLOGFLAG=-- -qlog" >> $GITHUB_ENV
       - name: Run tests
-        run: ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace integrationtests
+        run: |
+          ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace -skipPackage self integrationtests
+          ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace integrationtests/self ${{ env.QLOGFLAG }}
       - name: Run tests (32 bit)
         env:
           GOARCH: 386
-        run: ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace integrationtests
+        run: |
+          ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace -skipPackage self integrationtests
+          ginkgo -r -v -randomizeAllSpecs -randomizeSuites -trace integrationtests/self ${{ env.QLOGFLAG }}
+      - name: save qlogs
+        if: ${{ always() && env.DEBUG }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: qlogs
+          path: integrationtests/self/*.qlog
