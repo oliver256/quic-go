@@ -45,6 +45,7 @@ type streamManager interface {
 	UpdateLimits(*wire.TransportParameters)
 	HandleMaxStreamsFrame(*wire.MaxStreamsFrame) error
 	CloseWithError(error)
+	Reset(maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum protocol.StreamNum)
 }
 
 type cryptoStreamHandler interface {

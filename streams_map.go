@@ -45,6 +45,10 @@ var errTooManyOpenStreams = errors.New("too many open streams")
 
 type streamsMap struct {
 	perspective protocol.Perspective
+	version     protocol.VersionNumber
+
+	maxIncomingBidiStreams uint64
+	maxIncomingUniStreams  uint64
 
 	sender            streamSender
 	newFlowController func(protocol.StreamID) flowcontrol.StreamFlowController
@@ -66,41 +70,48 @@ func newStreamsMap(
 	version protocol.VersionNumber,
 ) streamManager {
 	m := &streamsMap{
-		perspective:       perspective,
-		newFlowController: newFlowController,
-		sender:            sender,
+		perspective:            perspective,
+		newFlowController:      newFlowController,
+		maxIncomingBidiStreams: maxIncomingBidiStreams,
+		maxIncomingUniStreams:  maxIncomingUniStreams,
+		sender:                 sender,
+		version:                version,
 	}
+	m.initMaps()
+	return m
+}
+
+func (m *streamsMap) initMaps() {
 	m.outgoingBidiStreams = newOutgoingBidiStreamsMap(
 		func(num protocol.StreamNum) streamI {
-			id := num.StreamID(protocol.StreamTypeBidi, perspective)
-			return newStream(id, m.sender, m.newFlowController(id), version)
+			id := num.StreamID(protocol.StreamTypeBidi, m.perspective)
+			return newStream(id, m.sender, m.newFlowController(id), m.version)
 		},
-		sender.queueControlFrame,
+		m.sender.queueControlFrame,
 	)
 	m.incomingBidiStreams = newIncomingBidiStreamsMap(
 		func(num protocol.StreamNum) streamI {
-			id := num.StreamID(protocol.StreamTypeBidi, perspective.Opposite())
-			return newStream(id, m.sender, m.newFlowController(id), version)
+			id := num.StreamID(protocol.StreamTypeBidi, m.perspective.Opposite())
+			return newStream(id, m.sender, m.newFlowController(id), m.version)
 		},
-		maxIncomingBidiStreams,
-		sender.queueControlFrame,
+		m.maxIncomingBidiStreams,
+		m.sender.queueControlFrame,
 	)
 	m.outgoingUniStreams = newOutgoingUniStreamsMap(
 		func(num protocol.StreamNum) sendStreamI {
-			id := num.StreamID(protocol.StreamTypeUni, perspective)
-			return newSendStream(id, m.sender, m.newFlowController(id), version)
+			id := num.StreamID(protocol.StreamTypeUni, m.perspective)
+			return newSendStream(id, m.sender, m.newFlowController(id), m.version)
 		},
-		sender.queueControlFrame,
+		m.sender.queueControlFrame,
 	)
 	m.incomingUniStreams = newIncomingUniStreamsMap(
 		func(num protocol.StreamNum) receiveStreamI {
-			id := num.StreamID(protocol.StreamTypeUni, perspective.Opposite())
-			return newReceiveStream(id, m.sender, m.newFlowController(id), version)
+			id := num.StreamID(protocol.StreamTypeUni, m.perspective.Opposite())
+			return newReceiveStream(id, m.sender, m.newFlowController(id), m.version)
 		},
-		maxIncomingUniStreams,
-		sender.queueControlFrame,
+		m.maxIncomingUniStreams,
+		m.sender.queueControlFrame,
 	)
-	return m
 }
 
 func (m *streamsMap) OpenStream() (Stream, error) {
@@ -232,4 +243,15 @@ func (m *streamsMap) CloseWithError(err error) {
 	m.outgoingUniStreams.CloseWithError(err)
 	m.incomingBidiStreams.CloseWithError(err)
 	m.incomingUniStreams.CloseWithError(err)
+}
+
+// Reset resets the streams map to its initial state.
+// It can be used after CloseWithError has been called.
+// It is used when 0-RTT is rejected: In that case, the streams map is
+// 1. closed with an Err0RTTRejected
+// 2. reset, using the new limits for the number of outgoing streams.
+func (m *streamsMap) Reset(maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum protocol.StreamNum) {
+	m.initMaps()
+	m.outgoingBidiStreams.SetMaxStream(maxOutgoingBidiStreamNum)
+	m.outgoingUniStreams.SetMaxStream(maxOutgoingUniStreamNum)
 }

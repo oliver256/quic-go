@@ -196,6 +196,18 @@ func (mr *MockStreamManagerMockRecorder) OpenUniStreamSync(arg0 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenUniStreamSync", reflect.TypeOf((*MockStreamManager)(nil).OpenUniStreamSync), arg0)
 }
 
+// Reset mocks base method.
+func (m *MockStreamManager) Reset(maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum protocol.StreamNum) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Reset", maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum)
+}
+
+// Reset indicates an expected call of Reset.
+func (mr *MockStreamManagerMockRecorder) Reset(maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reset", reflect.TypeOf((*MockStreamManager)(nil).Reset), maxOutgoingBidiStreamNum, maxOutgoingUniStreamNum)
+}
+
 // UpdateLimits mocks base method.
 func (m *MockStreamManager) UpdateLimits(arg0 *wire.TransportParameters) {
 	m.ctrl.T.Helper()
