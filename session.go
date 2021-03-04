@@ -1458,6 +1458,9 @@ func (s *session) dropEncryptionLevel(encLevel protocol.EncryptionLevel) {
 	if s.tracer != nil {
 		s.tracer.DroppedEncryptionLevel(encLevel)
 	}
+	if encLevel == protocol.Encryption0RTT {
+		s.streamsMap.CloseWithError(Err0RTTRejected)
+	}
 }
 
 // is called for the client, when restoring transport parameters saved for 0-RTT
@@ -1883,4 +1886,11 @@ func (s *session) getPerspective() protocol.Perspective {
 
 func (s *session) GetVersion() protocol.VersionNumber {
 	return s.version
+}
+
+func (s *session) NextSession() Session {
+	<-s.HandshakeComplete().Done()
+	s.streamsMap.Reset(s.peerParams.MaxBidiStreamNum, s.peerParams.MaxUniStreamNum)
+	s.connFlowController.Reset()
+	return s
 }
